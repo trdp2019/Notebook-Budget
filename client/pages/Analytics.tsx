@@ -107,7 +107,7 @@ export default function Analytics() {
         </div>
 
         <div className="space-y-8">
-          <Notebook noMarginLines>
+          <Notebook>
             <h2 className="font-hand text-2xl mb-4">Coming Months (Planned Net)</h2>
             <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
@@ -122,7 +122,7 @@ export default function Analytics() {
             </div>
           </Notebook>
 
-          <Notebook noMarginLines>
+          <Notebook>
             <h2 className="font-hand text-2xl mb-4">Category Breakdown</h2>
             {categoryData.length > 0 ? (
               <div className="h-56">
