@@ -19,13 +19,13 @@ export default function EntryList({ entries, onEdit, onDelete }: Props) {
         </div>
       )}
       {entries.map((e) => (
-        <div key={e.id} className="grid grid-cols-12 items-center gap-2 py-1 font-hand">
+        <div key={e.id} className="grid grid-cols-12 items-start gap-2 py-1 font-hand">
           <div className="col-span-2 text-sm opacity-80 -translate-x-[72px] ml-[72px] z-10">
             {format(parseISO(e.date), "MMM d")}
           </div>
-          <div className="col-span-3">{e.category}</div>
-          <div className="col-span-4">{e.note}</div>
-          <div className={`col-span-2 text-right ${e.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
+          <div className="col-span-3 min-w-0 break-words whitespace-normal">{e.category}</div>
+          <div className="col-span-4 min-w-0 break-words whitespace-normal">{e.note}</div>
+          <div className={`col-span-2 text-right min-w-0 break-words whitespace-normal ${e.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
             {e.type === "income" ? "+" : "-"}{formatINR(e.amount)}
             {e.planned && <span className="ml-2 text-xs text-amber-600">(planned)</span>}
           </div>
