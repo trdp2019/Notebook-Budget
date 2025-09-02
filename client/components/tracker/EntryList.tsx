@@ -26,7 +26,7 @@ export default function EntryList({ entries, onEdit, onDelete }: Props) {
           <div className="col-span-3 min-w-0 break-words whitespace-normal">{e.category}</div>
           <div className="col-span-4 min-w-0 break-words whitespace-normal">{e.note}</div>
           <div className={`col-span-2 text-right min-w-0 break-words whitespace-normal ${e.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>
-            {e.type === "income" ? "+" : "-"}{formatINR(e.amount)}
+            {formatINR(e.amount)}
             {e.planned && <span className="ml-2 text-xs text-amber-600">(planned)</span>}
           </div>
           <div className="col-span-1 flex justify-end gap-1">
