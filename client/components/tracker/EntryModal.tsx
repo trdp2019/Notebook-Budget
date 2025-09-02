@@ -6,7 +6,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Entry, EntryType } from "@/lib/storage";
-import { format } from "date-fns";
+import { addEntry } from "@/lib/storage";
+import { addMonths, format, parseISO } from "date-fns";
 
 interface Props {
   type: EntryType;
@@ -25,6 +26,8 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
     initial?.amount != null ? String(initial.amount) : ""
   );
   const [planned, setPlanned] = useState(initial?.planned ?? false);
+  const [recurring, setRecurring] = useState(false);
+  const [recurringMonths, setRecurringMonths] = useState("1");
 
   useEffect(() => {
     if (initial && !open) setOpen(true);
@@ -49,7 +52,10 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
   const handleSubmit = () => {
     const parsed = parseFloat(amountStr);
     if (!category || !date || Number.isNaN(parsed)) return;
-    const entry: Entry = {
+    const baseDate = parseISO(date);
+    const months = Math.max(1, parseInt(recurringMonths || "1", 10));
+
+    const first: Entry = {
       id: initial?.id ?? crypto.randomUUID(),
       type,
       date,
@@ -58,7 +64,22 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
       amount: parsed,
       planned,
     };
-    onSubmit(entry);
+    onSubmit(first);
+
+    for (let i = 1; recurring && i < months; i++) {
+      const nextDate = addMonths(baseDate, i);
+      const next: Entry = {
+        id: crypto.randomUUID(),
+        type,
+        date: format(nextDate, "yyyy-MM-dd"),
+        category,
+        note,
+        amount: parsed,
+        planned,
+      };
+      const monthKey = format(nextDate, "yyyy-MM");
+      addEntry(monthKey, next);
+    }
     setOpen(false);
   };
 
@@ -107,6 +128,28 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
             <Checkbox checked={planned} onCheckedChange={(v) => setPlanned(Boolean(v))} />
             Planned (budget)
           </label>
+          {planned && (
+            <div className="grid grid-cols-3 items-center gap-2">
+              <Label className="col-span-1">Recurring</Label>
+              <div className="col-span-2 flex items-center gap-3">
+                <Checkbox checked={recurring} onCheckedChange={(v) => setRecurring(Boolean(v))} />
+                {recurring && (
+                  <>
+                    <span className="font-hand">for</span>
+                    <Input
+                      className="w-20"
+                      type="number"
+                      min={1}
+                      step="1"
+                      value={recurringMonths}
+                      onChange={(e) => setRecurringMonths(e.target.value)}
+                    />
+                    <span className="font-hand">months</span>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>
               Cancel
