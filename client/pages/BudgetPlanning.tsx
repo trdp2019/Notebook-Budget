@@ -3,7 +3,7 @@ import Layout from "@/components/Layout";
 import Notebook from "@/components/Notebook";
 import MonthSelector from "@/components/tracker/MonthSelector";
 import { getCategories, getMonth, getMonthKey, loadData, monthTotals } from "@/lib/storage";
-import { formatINR } from "@/lib/currency";
+import { formatINR, formatINRNoTrailing } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,12 @@ export default function BudgetPlanning() {
     const savedBudgetsRaw = localStorage.getItem(`budgets-${monthKey}`);
     const savedBudgets: CategoryBudget[] | null = savedBudgetsRaw ? JSON.parse(savedBudgetsRaw) : null;
 
-    const allCats = Array.from(new Set([...categories, ...Object.keys(plannedTotals), ...(savedBudgets?.map((b) => b.category) || [])]));
-    const merged: CategoryBudget[] = allCats.map((cat) => {
+    // Order by Settings categories first, then any new categories alphabetically
+    const inSettings = categories.slice();
+    const extras = Array.from(new Set([...Object.keys(plannedTotals), ...(savedBudgets?.map((b) => b.category) || [])])).filter(c => !inSettings.includes(c)).sort();
+    const orderedCats = [...inSettings, ...extras];
+
+    const merged: CategoryBudget[] = orderedCats.map((cat) => {
       const saved = savedBudgets?.find((b) => b.category === cat)?.budgetAmount;
       const planned = plannedTotals[cat] || 0;
       const amount = saved && saved > 0 ? saved : planned;
@@ -120,7 +124,9 @@ export default function BudgetPlanning() {
     })).filter(item => item.Budget > 0);
   }, [budgets, actualAmounts]);
 
-  const totalBudget = budgets.reduce((sum, budget) => sum + (Number(budget.budgetAmount) || 0), 0);
+  const totalBudget = budgets
+    .filter((b) => !incomeCategories.includes(b.category))
+    .reduce((sum, budget) => sum + (Number(budget.budgetAmount) || 0), 0);
   const totalSpent = Object.entries(actualAmounts)
     .filter(([category]) => !incomeCategories.includes(category))
     .reduce((sum, [, amount]) => sum + amount, 0);
@@ -138,20 +144,20 @@ export default function BudgetPlanning() {
             {/* Budget Overview */}
             <div className="grid grid-cols-4 gap-4 mb-6 p-4">
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-blue-600">{formatINR(totalBudget)}</div>
+                <div className="text-2xl font-hand font-bold text-blue-600">{formatINRNoTrailing(totalBudget)}</div>
                 <div className="text-sm text-muted-foreground">Total Budget</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-green-600">{formatINR(totalEarned)}</div>
+                <div className="text-2xl font-hand font-bold text-green-600">{formatINRNoTrailing(totalEarned)}</div>
                 <div className="text-sm text-muted-foreground">Total Earned</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-red-600">{formatINR(totalSpent)}</div>
+                <div className="text-2xl font-hand font-bold text-red-600">{formatINRNoTrailing(totalSpent)}</div>
                 <div className="text-sm text-muted-foreground">Total Spent</div>
               </div>
               <div className="text-center">
                 <div className={`text-2xl font-hand font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatINR(totalEarned - totalSpent)}
+                  {formatINRNoTrailing(totalEarned - totalSpent)}
                 </div>
                 <div className="text-sm text-muted-foreground">Net</div>
               </div>
@@ -159,10 +165,11 @@ export default function BudgetPlanning() {
 
             {/* Budget List */}
             <div className="space-y-3">
-              {budgets.map((budget) => (
+              {budgets.filter(b => (Number(b.budgetAmount) || 0) > 0 || (actualAmounts[b.category] || 0) > 0).map((budget) => (
                 <div key={budget.category} className="grid grid-cols-12 items-center gap-2 p-2">
-                  <div className="col-span-3 font-hand min-w-0 break-words whitespace-normal">{budget.category}</div>
-                  <div className="col-span-3">
+                  <div className="col-span-3 font-hand text-[16px] min-w-0 break-words whitespace-normal">{budget.category}</div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <span className="font-hand text-[16px] pr-1">₹</span>
                     <Input
                       type="number"
                       step="0.01"
@@ -172,11 +179,11 @@ export default function BudgetPlanning() {
                       className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
                     />
                   </div>
-                  <div className="col-span-3 text-right font-hand mr-[30px]">
-                    {incomeCategories.includes(budget.category) ? 'Earned' : 'Spent'}: {formatINR(actualAmounts[budget.category] || 0)}
+                  <div className="col-span-3 text-right font-hand text-[16px] mr-[30px]">
+                    {incomeCategories.includes(budget.category) ? 'Earned' : 'Spent'}: {formatINRNoTrailing(actualAmounts[budget.category] || 0)}
                   </div>
-                  <div className="col-span-2 text-right font-hand">
-                    {incomeCategories.includes(budget.category) ? 'Remaining' : 'Left'}: {formatINR(Math.max(0, budget.budgetAmount - (actualAmounts[budget.category] || 0)))}
+                  <div className="col-span-2 text-right font-hand text-[16px]">
+                    {incomeCategories.includes(budget.category) ? 'Remaining' : 'Left'}: {formatINRNoTrailing(Math.max(0, budget.budgetAmount - (actualAmounts[budget.category] || 0)))}
                   </div>
                   <div className="col-span-1">
                     <span className="cursor-pointer text-red-600 font-hand text-lg" onClick={() => removeBudget(budget.category)}>
@@ -202,14 +209,17 @@ export default function BudgetPlanning() {
                 </select>
               </div>
               <div className="col-span-3">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={newBudgetAmount}
-                  onChange={(e) => setNewBudgetAmount(e.target.value)}
-                  placeholder="Budget amount"
-                  className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="font-hand text-[16px] pr-1">₹</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newBudgetAmount}
+                    onChange={(e) => setNewBudgetAmount(e.target.value)}
+                    placeholder="Budget amount"
+                    className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
+                  />
+                </div>
               </div>
               <div className="col-span-6 flex justify-end">
                 <span className="cursor-pointer text-blue-600 underline font-hand" onClick={addNewBudget}>+ Add Budget</span>
@@ -228,7 +238,7 @@ export default function BudgetPlanning() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" />
                     <YAxis />
-                    <RTooltip formatter={(value) => formatINR(Number(value))} />
+                    <RTooltip formatter={(value) => formatINRNoTrailing(Number(value))} />
                     <Bar dataKey="Budget" fill="#3b82f6" stroke="#1e40af" strokeWidth={1} />
                     <Bar dataKey="Actual" fill="#ef4444" stroke="#b91c1c" strokeWidth={1} />
                   </BarChart>
