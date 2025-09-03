@@ -38,7 +38,7 @@ export default function BudgetPlanning() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Load/merge budgets. Seed from planned entries but avoid infinite loops by only setting when changed.
+  // Load/merge budgets. Seed from planned/actual entries but avoid infinite loops by only setting when changed.
   useEffect(() => {
     const latest = loadData();
     const monthData = getMonth(latest, monthKey);
@@ -50,20 +50,37 @@ export default function BudgetPlanning() {
         return acc;
       }, {} as Record<string, number>);
 
+    const actualTotals = monthData.entries
+      .filter((e) => !e.planned)
+      .reduce((acc, e) => {
+        acc[e.category] = (acc[e.category] || 0) + e.amount;
+        return acc;
+      }, {} as Record<string, number>);
+
     const savedBudgetsRaw = localStorage.getItem(`budgets-${monthKey}`);
     const savedBudgets: CategoryBudget[] | null = savedBudgetsRaw ? JSON.parse(savedBudgetsRaw) : null;
 
     // Order by Settings categories first, then any new categories alphabetically
     const inSettings = categories.slice();
-    const extras = Array.from(new Set([...Object.keys(plannedTotals), ...(savedBudgets?.map((b) => b.category) || [])])).filter(c => !inSettings.includes(c)).sort();
+    const unionCats = Array.from(
+      new Set([
+        ...Object.keys(plannedTotals),
+        ...Object.keys(actualTotals),
+        ...(savedBudgets?.map((b) => b.category) || []),
+      ]),
+    );
+    const extras = unionCats.filter((c) => !inSettings.includes(c)).sort();
     const orderedCats = [...inSettings, ...extras];
 
-    const merged: CategoryBudget[] = orderedCats.map((cat) => {
-      const saved = savedBudgets?.find((b) => b.category === cat)?.budgetAmount;
+    const merged: CategoryBudget[] = [];
+    for (const cat of orderedCats) {
+      const saved = savedBudgets?.find((b) => b.category === cat)?.budgetAmount || 0;
       const planned = plannedTotals[cat] || 0;
-      const amount = saved && saved > 0 ? saved : planned;
-      return { category: cat, budgetAmount: amount };
-    });
+      const keep = saved > 0 || planned > 0 || (actualTotals[cat] || 0) > 0;
+      if (!keep) continue; // do not include empty categories
+      const amount = saved > 0 ? saved : planned;
+      merged.push({ category: cat, budgetAmount: amount });
+    }
 
     const current = JSON.stringify(budgets);
     const next = JSON.stringify(merged);
@@ -90,6 +107,14 @@ export default function BudgetPlanning() {
     if (!newBudgetCategory || !newBudgetAmount) return;
     const amount = parseFloat(newBudgetAmount);
     if (isNaN(amount)) return;
+
+    // Avoid duplicates
+    if (budgets.some((b) => b.category === newBudgetCategory)) {
+      updateBudget(newBudgetCategory, amount);
+      setNewBudgetCategory("");
+      setNewBudgetAmount("");
+      return;
+    }
 
     const newBudgets = [...budgets, { category: newBudgetCategory, budgetAmount: amount }];
     saveBudgets(newBudgets);
