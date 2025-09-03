@@ -145,13 +145,13 @@ export default function Index() {
             <Notebook>
               <h2 className="font-hand text-2xl mb-4 mx-auto w-max">Summary</h2>
               <div className="space-y-2 font-hand">
-                <div className="flex justify-between"><span>Income planned</span><span className="text-emerald-700">{formatINR(totals.income.planned)}</span></div>
-                <div className="flex justify-between"><span>Income actual</span><span className="text-emerald-700">{formatINR(totals.income.actual)}</span></div>
-                <div className="flex justify-between"><span>Expense planned</span><span className="text-rose-700">{formatINR(totals.expense.planned)}</span></div>
-                <div className="flex justify-between"><span>Expense actual</span><span className="text-rose-700">{formatINR(totals.expense.actual)}</span></div>
+                <div className="flex justify-between"><span>Income planned</span><span className="text-emerald-600">{formatINR(totals.income.planned)}</span></div>
+                <div className="flex justify-between"><span>Income actual</span><span className="text-emerald-600">{formatINR(totals.income.actual)}</span></div>
+                <div className="flex justify-between"><span>Expense planned</span><span className="text-rose-600">{formatINR(totals.expense.planned)}</span></div>
+                <div className="flex justify-between"><span>Expense actual</span><span className="text-rose-600">{formatINR(totals.expense.actual)}</span></div>
                 <div className="h-px bg-muted my-2" />
-                <div className="flex justify-between"><span>Net planned</span><span className={totals.net.planned >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatINR(totals.net.planned)}</span></div>
-                <div className="flex justify-between"><span>Net actual</span><span className={totals.net.actual >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatINR(totals.net.actual)}</span></div>
+                <div className="flex justify-between"><span>Net planned</span><span className={totals.net.planned >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatINR(totals.net.planned)}</span></div>
+                <div className="flex justify-between"><span>Net actual</span><span className={totals.net.actual >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatINR(totals.net.actual)}</span></div>
               </div>
             </Notebook>
 
