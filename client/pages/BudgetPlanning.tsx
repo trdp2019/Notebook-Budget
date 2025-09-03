@@ -3,7 +3,7 @@ import Layout from "@/components/Layout";
 import Notebook from "@/components/Notebook";
 import MonthSelector from "@/components/tracker/MonthSelector";
 import { getCategories, getMonth, getMonthKey, loadData, monthTotals } from "@/lib/storage";
-import { formatINR } from "@/lib/currency";
+import { formatINR, formatINRNoTrailing } from "@/lib/currency";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,21 +20,75 @@ export default function BudgetPlanning() {
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [newBudgetCategory, setNewBudgetCategory] = useState("");
   const [newBudgetAmount, setNewBudgetAmount] = useState("");
+  const [version, setVersion] = useState(0); // bump when storage changes
 
   const data = loadData();
   const month = getMonth(data, monthKey);
   const totals = useMemo(() => monthTotals(month), [month]);
 
-  // Load budgets from localStorage
+  // React to storage changes from other tabs/pages
   useEffect(() => {
-    const savedBudgets = localStorage.getItem(`budgets-${monthKey}`);
-    if (savedBudgets) {
-      setBudgets(JSON.parse(savedBudgets));
-    } else {
-      // Initialize with empty budgets for all categories
-      setBudgets(categories.map(cat => ({ category: cat, budgetAmount: 0 })));
+    const onStorage = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key.includes("notebook-expense-tracker") || e.key.startsWith("budgets-")) {
+        setVersion((v) => v + 1);
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
+  // Load/merge budgets. Seed from planned/actual entries but avoid infinite loops by only setting when changed.
+  useEffect(() => {
+    const latest = loadData();
+    const monthData = getMonth(latest, monthKey);
+
+    const plannedTotals = monthData.entries
+      .filter((e) => e.planned)
+      .reduce((acc, e) => {
+        acc[e.category] = (acc[e.category] || 0) + e.amount;
+        return acc;
+      }, {} as Record<string, number>);
+
+    const actualTotals = monthData.entries
+      .filter((e) => !e.planned)
+      .reduce((acc, e) => {
+        acc[e.category] = (acc[e.category] || 0) + e.amount;
+        return acc;
+      }, {} as Record<string, number>);
+
+    const savedBudgetsRaw = localStorage.getItem(`budgets-${monthKey}`);
+    const savedBudgets: CategoryBudget[] | null = savedBudgetsRaw ? JSON.parse(savedBudgetsRaw) : null;
+
+    // Order by Settings categories first, then any new categories alphabetically
+    const inSettings = categories.slice();
+    const unionCats = Array.from(
+      new Set([
+        ...Object.keys(plannedTotals),
+        ...Object.keys(actualTotals),
+        ...(savedBudgets?.map((b) => b.category) || []),
+      ]),
+    );
+    const extras = unionCats.filter((c) => !inSettings.includes(c)).sort();
+    const orderedCats = [...inSettings, ...extras];
+
+    const merged: CategoryBudget[] = [];
+    for (const cat of orderedCats) {
+      const saved = savedBudgets?.find((b) => b.category === cat)?.budgetAmount || 0;
+      const planned = plannedTotals[cat] || 0;
+      const keep = saved > 0 || planned > 0 || (actualTotals[cat] || 0) > 0;
+      if (!keep) continue; // do not include empty categories
+      const amount = saved > 0 ? saved : planned;
+      merged.push({ category: cat, budgetAmount: amount });
     }
-  }, [monthKey, categories]);
+
+    const current = JSON.stringify(budgets);
+    const next = JSON.stringify(merged);
+    if (current !== next) {
+      setBudgets(merged);
+      localStorage.setItem(`budgets-${monthKey}`, JSON.stringify(merged));
+    }
+  }, [monthKey, categories, version, budgets]);
 
   // Save budgets to localStorage
   const saveBudgets = (newBudgets: CategoryBudget[]) => {
@@ -53,6 +107,14 @@ export default function BudgetPlanning() {
     if (!newBudgetCategory || !newBudgetAmount) return;
     const amount = parseFloat(newBudgetAmount);
     if (isNaN(amount)) return;
+
+    // Avoid duplicates
+    if (budgets.some((b) => b.category === newBudgetCategory)) {
+      updateBudget(newBudgetCategory, amount);
+      setNewBudgetCategory("");
+      setNewBudgetAmount("");
+      return;
+    }
 
     const newBudgets = [...budgets, { category: newBudgetCategory, budgetAmount: amount }];
     saveBudgets(newBudgets);
@@ -87,7 +149,9 @@ export default function BudgetPlanning() {
     })).filter(item => item.Budget > 0);
   }, [budgets, actualAmounts]);
 
-  const totalBudget = budgets.reduce((sum, budget) => sum + budget.budgetAmount, 0);
+  const totalBudget = budgets
+    .filter((b) => !incomeCategories.includes(b.category))
+    .reduce((sum, budget) => sum + (Number(budget.budgetAmount) || 0), 0);
   const totalSpent = Object.entries(actualAmounts)
     .filter(([category]) => !incomeCategories.includes(category))
     .reduce((sum, [, amount]) => sum + amount, 0);
@@ -105,20 +169,20 @@ export default function BudgetPlanning() {
             {/* Budget Overview */}
             <div className="grid grid-cols-4 gap-4 mb-6 p-4">
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-blue-600">{formatINR(totalBudget)}</div>
+                <div className="text-2xl font-hand font-bold text-blue-600">{formatINRNoTrailing(totalBudget)}</div>
                 <div className="text-sm text-muted-foreground">Total Budget</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-green-600">{formatINR(totalEarned)}</div>
+                <div className="text-2xl font-hand font-bold text-green-600">{formatINRNoTrailing(totalEarned)}</div>
                 <div className="text-sm text-muted-foreground">Total Earned</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-hand font-bold text-red-600">{formatINR(totalSpent)}</div>
+                <div className="text-2xl font-hand font-bold text-red-600">{formatINRNoTrailing(totalSpent)}</div>
                 <div className="text-sm text-muted-foreground">Total Spent</div>
               </div>
               <div className="text-center">
                 <div className={`text-2xl font-hand font-bold ${totalEarned - totalSpent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatINR(totalEarned - totalSpent)}
+                  {formatINRNoTrailing(totalEarned - totalSpent)}
                 </div>
                 <div className="text-sm text-muted-foreground">Net</div>
               </div>
@@ -126,10 +190,11 @@ export default function BudgetPlanning() {
 
             {/* Budget List */}
             <div className="space-y-3">
-              {budgets.map((budget) => (
+              {budgets.filter(b => (Number(b.budgetAmount) || 0) > 0 || (actualAmounts[b.category] || 0) > 0).map((budget) => (
                 <div key={budget.category} className="grid grid-cols-12 items-center gap-2 p-2">
-                  <div className="col-span-3 font-hand">{budget.category}</div>
-                  <div className="col-span-3">
+                  <div className="col-span-3 font-hand text-[16px] min-w-0 break-words whitespace-normal">{budget.category}</div>
+                  <div className="col-span-3 flex items-center gap-2">
+                    <span className="font-hand text-[16px] pr-1">₹</span>
                     <Input
                       type="number"
                       step="0.01"
@@ -139,11 +204,11 @@ export default function BudgetPlanning() {
                       className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
                     />
                   </div>
-                  <div className="col-span-3 text-right font-hand mr-[30px]">
-                    {incomeCategories.includes(budget.category) ? 'Earned' : 'Spent'}: {formatINR(actualAmounts[budget.category] || 0)}
+                  <div className="col-span-3 text-right font-hand text-[16px] mr-[30px]">
+                    {incomeCategories.includes(budget.category) ? 'Earned' : 'Spent'}: {formatINRNoTrailing(actualAmounts[budget.category] || 0)}
                   </div>
-                  <div className="col-span-2 text-right font-hand">
-                    {incomeCategories.includes(budget.category) ? 'Remaining' : 'Left'}: {formatINR(Math.max(0, budget.budgetAmount - (actualAmounts[budget.category] || 0)))}
+                  <div className="col-span-2 text-right font-hand text-[16px]">
+                    {incomeCategories.includes(budget.category) ? 'Remaining' : 'Left'}: {formatINRNoTrailing(Math.max(0, budget.budgetAmount - (actualAmounts[budget.category] || 0)))}
                   </div>
                   <div className="col-span-1">
                     <span className="cursor-pointer text-red-600 font-hand text-lg" onClick={() => removeBudget(budget.category)}>
@@ -169,14 +234,17 @@ export default function BudgetPlanning() {
                 </select>
               </div>
               <div className="col-span-3">
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={newBudgetAmount}
-                  onChange={(e) => setNewBudgetAmount(e.target.value)}
-                  placeholder="Budget amount"
-                  className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
-                />
+                <div className="flex items-center gap-2">
+                  <span className="font-hand text-[16px] pr-1">₹</span>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={newBudgetAmount}
+                    onChange={(e) => setNewBudgetAmount(e.target.value)}
+                    placeholder="Budget amount"
+                    className="bg-transparent border-none shadow-none focus:ring-0 font-hand text-[16px]"
+                  />
+                </div>
               </div>
               <div className="col-span-6 flex justify-end">
                 <span className="cursor-pointer text-blue-600 underline font-hand" onClick={addNewBudget}>+ Add Budget</span>
@@ -195,7 +263,7 @@ export default function BudgetPlanning() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="category" />
                     <YAxis />
-                    <RTooltip formatter={(value) => formatINR(Number(value))} />
+                    <RTooltip formatter={(value) => formatINRNoTrailing(Number(value))} />
                     <Bar dataKey="Budget" fill="#3b82f6" stroke="#1e40af" strokeWidth={1} />
                     <Bar dataKey="Actual" fill="#ef4444" stroke="#b91c1c" strokeWidth={1} />
                   </BarChart>

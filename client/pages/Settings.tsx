@@ -27,6 +27,28 @@ export default function Settings() {
     setNewCategory("");
   };
 
+  // Drag & Drop reordering
+  const dragIndex = useRef<number | null>(null);
+  const onDragStart = (idx: number) => (e: React.DragEvent) => {
+    dragIndex.current = idx;
+    e.dataTransfer.effectAllowed = "move";
+  };
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+  const onDrop = (idx: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    const from = dragIndex.current;
+    dragIndex.current = null;
+    if (from == null || from === idx) return;
+    const next = categories.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(idx, 0, moved);
+    setLocalCategories(next);
+    setCategories(next);
+  };
+
   const removeCat = (c: string) => {
     const next = categories.filter((x) => x !== c);
     setLocalCategories(next);
@@ -112,9 +134,16 @@ export default function Settings() {
             <Input placeholder="Add category" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addCat()} className="bg-transparent border-none shadow-none focus:ring-0 font-hand" />
             <Button onClick={addCat} variant="link" className="font-hand text-blue-600 underline">Add</Button>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((c) => (
-              <Badge key={c} variant="secondary" className="font-hand text-base py-1">
+          <div className="flex flex-wrap gap-2" onDragOver={onDragOver}>
+            {categories.map((c, idx) => (
+              <Badge
+                key={c}
+                variant="secondary"
+                className="font-hand text-base py-1 cursor-move"
+                draggable
+                onDragStart={onDragStart(idx)}
+                onDrop={onDrop(idx)}
+              >
                 {c}
                 <button className="ml-2 opacity-70 hover:opacity-100" onClick={() => removeCat(c)} aria-label={`Remove ${c}`}>
                   ×

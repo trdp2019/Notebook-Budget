@@ -36,8 +36,9 @@ export default function Index() {
     return [...month.entries].sort((a, b) => a.date.localeCompare(b.date));
   }, [month]);
 
-  const incomes = useMemo(() => sortedEntries.filter((e) => e.type === "income"), [sortedEntries]);
-  const expenses = useMemo(() => sortedEntries.filter((e) => e.type === "expense"), [sortedEntries]);
+  const visibleEntries = useMemo(() => sortedEntries.filter((e) => !e.planned), [sortedEntries]);
+  const incomes = useMemo(() => visibleEntries.filter((e) => e.type === "income"), [visibleEntries]);
+  const expenses = useMemo(() => visibleEntries.filter((e) => e.type === "expense"), [visibleEntries]);
 
   const onAdd = (e: Entry) => {
     addEntry(monthKey, e);
@@ -86,7 +87,7 @@ export default function Index() {
                           <div className="col-span-2 text-right">Amount</div>
                           <div className="col-span-1" />
                         </div>
-                        <EntryList entries={sortedEntries} onEdit={onEdit} onDelete={onDelete} />
+                        <EntryList entries={visibleEntries} onEdit={onEdit} onDelete={onDelete} />
                       </div>
                     )
                   },
@@ -141,20 +142,20 @@ export default function Index() {
           </div>
 
           <div className="space-y-8">
-            <Notebook noMarginLines>
+            <Notebook>
               <h2 className="font-hand text-2xl mb-4 mx-auto w-max">Summary</h2>
               <div className="space-y-2 font-hand">
-                <div className="flex justify-between"><span>Income planned</span><span className="text-emerald-700">{formatINR(totals.income.planned)}</span></div>
-                <div className="flex justify-between"><span>Income actual</span><span className="text-emerald-700">{formatINR(totals.income.actual)}</span></div>
-                <div className="flex justify-between"><span>Expense planned</span><span className="text-rose-700">{formatINR(totals.expense.planned)}</span></div>
-                <div className="flex justify-between"><span>Expense actual</span><span className="text-rose-700">{formatINR(totals.expense.actual)}</span></div>
+                <div className="flex justify-between"><span>Income planned</span><span className="text-emerald-600">{formatINR(totals.income.planned)}</span></div>
+                <div className="flex justify-between"><span>Income actual</span><span className="text-emerald-600">{formatINR(totals.income.actual)}</span></div>
+                <div className="flex justify-between"><span>Expense planned</span><span className="text-rose-600">{formatINR(totals.expense.planned)}</span></div>
+                <div className="flex justify-between"><span>Expense actual</span><span className="text-rose-600">{formatINR(totals.expense.actual)}</span></div>
                 <div className="h-px bg-muted my-2" />
-                <div className="flex justify-between"><span>Net planned</span><span className={totals.net.planned >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatINR(totals.net.planned)}</span></div>
-                <div className="flex justify-between"><span>Net actual</span><span className={totals.net.actual >= 0 ? "text-emerald-700" : "text-rose-700"}>{formatINR(totals.net.actual)}</span></div>
+                <div className="flex justify-between"><span>Net planned</span><span className={totals.net.planned >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatINR(totals.net.planned)}</span></div>
+                <div className="flex justify-between"><span>Net actual</span><span className={totals.net.actual >= 0 ? "text-emerald-600" : "text-rose-600"}>{formatINR(totals.net.actual)}</span></div>
               </div>
             </Notebook>
 
-            <Notebook noMarginLines>
+            <Notebook>
               <h2 className="font-hand text-2xl mb-4 mx-auto w-max">Analytics</h2>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
