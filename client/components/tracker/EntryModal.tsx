@@ -15,9 +15,10 @@ interface Props {
   triggerLabel: string;
   onSubmit: (entry: Entry) => void;
   initial?: Entry | null;
+  onClose?: () => void;
 }
 
-export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }: Props) {
+export function EntryModal({ type, categories, triggerLabel, onSubmit, initial, onClose }: Props) {
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState(initial?.date ?? format(new Date(), "yyyy-MM-dd"));
   const [category, setCategory] = useState(initial?.category ?? categories[0] ?? "Misc");
@@ -30,22 +31,21 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
   const [recurringMonths, setRecurringMonths] = useState("1");
 
   useEffect(() => {
-    if (initial && !open) setOpen(true);
-    if (open && initial) {
+    if (initial) {
+      setOpen(true);
       setDate(initial.date);
       setCategory(initial.category);
       setNote(initial.note);
       setAmountStr(String(initial.amount ?? ""));
       setPlanned(initial.planned);
-    }
-    if (open && !initial) {
+    } else if (open) {
       setDate(format(new Date(), "yyyy-MM-dd"));
       setCategory(categories[0] ?? "Misc");
       setNote("");
       setAmountStr("");
       setPlanned(false);
     }
-  }, [open, initial, categories]);
+  }, [initial, categories]);
 
   const title = useMemo(() => (initial ? `Edit ${type}` : `Add ${type}`), [initial, type]);
 
@@ -84,7 +84,7 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) onClose?.(); }}>
       {triggerLabel && (
         <DialogTrigger asChild>
           <span className={`cursor-pointer underline font-hand ${type === "income" ? "text-blue-600" : "text-red-600"}`}>
@@ -151,7 +151,7 @@ export function EntryModal({ type, categories, triggerLabel, onSubmit, initial }
             </div>
           )}
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setOpen(false)}>
+            <Button variant="outline" onClick={() => { setOpen(false); onClose?.(); }}>
               Cancel
             </Button>
             <Button onClick={handleSubmit}>{initial ? "Save" : "Add"}</Button>
