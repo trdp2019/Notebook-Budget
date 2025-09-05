@@ -24,7 +24,7 @@ export default function Settings() {
     setLocalCategories(getCategories());
   }, []);
 
-  const latestEntries = useMemo(() => {
+  const allEntries = useMemo(() => {
     const data = loadData();
     const rows: (Entry & { monthKey: string })[] = [];
     for (const [mKey, month] of Object.entries(data.months)) {
@@ -33,7 +33,7 @@ export default function Settings() {
       }
     }
     rows.sort((a, b) => b.date.localeCompare(a.date));
-    return rows.slice(0, 10);
+    return rows;
   }, [version]);
 
   const addCat = () => {
@@ -181,31 +181,33 @@ export default function Settings() {
 
           {logsOpen && (
             <div className="mb-6">
-              <h3 className="font-hand text-lg font-semibold mb-3">Latest 10 Entries</h3>
-              {latestEntries.length === 0 && (
+              <h3 className="font-hand text-lg font-semibold mb-3">All Entries</h3>
+              {allEntries.length === 0 && (
                 <div className="py-4 text-muted-foreground font-hand">No entries yet.</div>
               )}
-              {latestEntries.length > 0 && (
+              {allEntries.length > 0 && (
                 <div>
                   <div className="grid grid-cols-12 text-xs uppercase tracking-wider text-muted-foreground font-sans pb-2 mb-2">
                     <div className="col-span-2">Date</div>
                     <div className="col-span-2">Type</div>
-                    <div className="col-span-3">Category</div>
-                    <div className="col-span-3 text-right">Amount</div>
-                    <div className="col-span-2" />
+                    <div className="col-span-2">Category</div>
+                    <div className="col-span-3">Note</div>
+                    <div className="col-span-2 text-right">Amount</div>
+                    <div className="col-span-1" />
                   </div>
                   <div className="space-y-1">
-                    {latestEntries.map((e) => (
+                    {allEntries.map((e) => (
                       <div key={e.id} className="grid grid-cols-12 items-center gap-2 py-1 font-hand">
-                        <div className="col-span-2">{format(parseISO(e.date), "MMM d, yyyy")}</div>
-                        <div className="col-span-2 capitalize">{e.type}</div>
-                        <div className="col-span-3 min-w-0 break-words whitespace-normal">{e.category}</div>
-                        <div className={`col-span-3 text-right ${e.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>{formatINR(e.amount)}</div>
-                        <div className="col-span-2 flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" onClick={() => setEditing(e)} aria-label="Edit">
+                        <div className="col-span-2 whitespace-nowrap">{format(parseISO(e.date), "MMM d, yyyy")}</div>
+                        <div className="col-span-2 capitalize whitespace-nowrap">{e.type}</div>
+                        <div className="col-span-2 min-w-0 truncate">{e.category}</div>
+                        <div className="col-span-3 min-w-0 truncate">{e.note}</div>
+                        <div className={`col-span-2 text-right whitespace-nowrap ${e.type === "income" ? "text-emerald-600" : "text-rose-600"}`}>{formatINR(e.amount)}</div>
+                        <div className="col-span-1 flex justify-end gap-1">
+                          <Button size="icon" variant="ghost" onClick={() => setEditing(e)} aria-label="Edit" className="h-8 w-8 md:h-10 md:w-10">
                             <Pencil className="h-4 w-4" />
                           </Button>
-                          <Button size="icon" variant="ghost" onClick={() => { removeEntry(getMonthKey(new Date(e.date)), e.id); setVersion(v => v + 1); }} aria-label="Delete">
+                          <Button size="icon" variant="ghost" onClick={() => { removeEntry(e.monthKey, e.id); setVersion(v => v + 1); }} aria-label="Delete" className="h-8 w-8 md:h-10 md:w-10">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
@@ -278,6 +280,7 @@ export default function Settings() {
           categories={categories}
           triggerLabel=""
           initial={editing}
+          onClose={() => setEditing(null)}
           onSubmit={(next) => {
             const mKey = getMonthKey(new Date(next.date));
             updateEntry(mKey, next);
